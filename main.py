@@ -8,7 +8,7 @@ from state import State
 
 @route
 def index(state: State) -> Page:
-    return Page(state, ["Hello ___!"])
+    return Page(state, ["Hello World!"])
 
 
 start_server(State())
