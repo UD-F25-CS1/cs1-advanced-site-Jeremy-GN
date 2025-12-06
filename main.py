@@ -1,6 +1,7 @@
 from drafter import set_site_information, hide_debug_information, set_website_title, set_website_framed, route, Page, TextArea, LineBreak, Button, start_server
 from dataclasses import dataclass
 from drafter.llm import LLMMessage, LLMResponse, call_gemini, set_gemini_server
+from typing import Optional
 
 
 
@@ -36,7 +37,7 @@ class State:
     :param last_description: The user's description for the last build
     :type last_description: str
     """
-    last_website: WebsiteBuild | None
+    last_website: Optional[WebsiteBuild]
     last_description: str
 
 
