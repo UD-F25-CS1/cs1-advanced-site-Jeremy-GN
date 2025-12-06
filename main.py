@@ -7,4 +7,4 @@ def index(state: State) -> Page:
     return Page(state, ["Hello World!"])
 
 
-start_server(State()) #testing!
+start_server(State()) #ready to work
