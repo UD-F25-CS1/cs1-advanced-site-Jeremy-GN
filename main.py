@@ -1,5 +1,4 @@
-from bakery import assert_equal
-from drafter import *
+from drafter import set_site_information, hide_debug_information, set_website_title, set_website_framed, route, Page, TextArea, LineBreak, Button, start_server
 from dataclasses import dataclass
 from drafter.llm import LLMMessage, LLMResponse, call_gemini, set_gemini_server
 
@@ -44,7 +43,7 @@ def index(state: State) -> Page:
 def show_chat(state: State) -> Page:
     """Display the chat interface with conversation history."""
     content = [
-        f"Chatbot using Gemini",
+        "Chatbot using Gemini",
         "---"
     ]
 
@@ -62,8 +61,8 @@ def show_chat(state: State) -> Page:
         "Your message:",
         TextArea("user_message", "", rows=3, cols=50),
         LineBreak(),
-        Button("Send", send_message),
-        Button("Clear Conversation", clear_conversation),
+        Button("Send", send_message), # type: ignore
+        Button("Clear Conversation", clear_conversation), # type: ignore
     ])
 
     return Page(state, content)
