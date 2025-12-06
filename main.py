@@ -1,6 +1,6 @@
 from drafter import set_site_information, hide_debug_information, set_website_title, set_website_framed, route, Page, TextArea, LineBreak, Button, start_server, Pre
 from dataclasses import dataclass
-from drafter.llm import LLMMessage, LLMResponse, call_gemini, set_gemini_server
+from drafter.llm import LLMMessage, LLMResponse, call_gemini
 from typing import Optional
 
 
@@ -13,7 +13,7 @@ set_site_information(
     links=["https://github.com/UD-F25-CS1/cs1-advanced-site-Jeremy-GN"]
 )
 
-set_gemini_server("https://drafter-gemini-proxy.jgn.workers.dev/")
+#set_gemini_server("https://drafter-gemini-proxy.jgn.workers.dev/")
 
 with open("styles.css", "r") as file:
     main_screen_css: str = "<style>" + file.read() + "</style>"
@@ -95,7 +95,7 @@ Format your response with these exact tags:
     # Call Gemini to generate the website and handle errors/edge-cases
     messages = [LLMMessage("user", prompt)]
     try:
-        result = call_gemini(messages, max_tokens=8000)
+        result = call_gemini(messages, api_key="AIzaSyBGEULRVVYf4ZVVIjgPo1Ep3mTY19rWRyw", max_tokens=8000)
     except Exception as exc:
         # Unexpected exception when calling the API (network/proxy/library)
         error_html = (
