@@ -5,11 +5,11 @@ from drafter.llm import LLMMessage, LLMResponse, call_gemini, set_gemini_server
 
 
 set_site_information(
-    author="testing!!",
-    description="A brief description of what your website does",
-    sources="List any help resources or sources you used",
-    planning="your_planning_document.pdf",
-    links=["https://github.com/your-username/your-repo"]
+    author="cjwells@udel.edu, jgn@udel.edu",
+    description="Build a website using Gemini LLMs with Drafter",
+    sources="Official drafter documentation",
+    planning="",
+    links=["https://github.com/UD-F25-CS1/cs1-advanced-site-Jeremy-GN"]
 )
 
 set_gemini_server("https://drafter-gemini-proxy.jgn.workers.dev/")
@@ -19,84 +19,127 @@ hide_debug_information()
 set_website_title("Your Drafter Website")
 set_website_framed(False)
 
+@dataclass
+class WebsiteBuild:
+    website_html: str
+    website_css: str
+    website_js: str
+
 
 @dataclass
 class State:
     """
-    The state of our chatbot application.
+    The state of our website builder application.
 
-    :param conversation: List of messages in the conversation
-    :type conversation: List[LLMMessage]
+    :param last_website: The most recently built website
+    :type last_website: WebsiteBuild | None
+    :param last_description: The user's description for the last build
+    :type last_description: str
     """
-    conversation: list[LLMMessage]
+    last_website: WebsiteBuild | None
+    last_description: str
 
 
 @route
 def index(state: State) -> Page:
     """
-    Main page of the chatbot application.
-    Shows API key setup if not configured, otherwise shows the chat interface.
+    Main page of the website builder application.
     """
-    return show_chat(state)
+    return show_builder(state)
 
 
-def show_chat(state: State) -> Page:
-    """Display the chat interface with conversation history."""
+def parse_website_response(response_text: str) -> WebsiteBuild:
+    """
+    Parse the LLM response to extract HTML, CSS, and JS.
+    Assumes response is formatted with markers like:
+    <html>...</html>
+    <style>...</style>
+    <script>...</script>
+    """
+    html = ""
+    css = ""
+    js = ""
+
+    # Extract HTML
+    html_start = response_text.find("<html>")
+    html_end = response_text.find("</html>")
+    if html_start != -1 and html_end != -1:
+        html = response_text[html_start:html_end + 7]
+
+    # Extract CSS (from <style> tags)
+    style_start = response_text.find("<style>")
+    style_end = response_text.find("</style>")
+    if style_start != -1 and style_end != -1:
+        css = response_text[style_start + 7:style_end]
+
+    # Extract JavaScript (from <script> tags)
+    script_start = response_text.find("<script>")
+    script_end = response_text.find("</script>")
+    if script_start != -1 and script_end != -1:
+        js = response_text[script_start + 8:script_end]
+
+    return WebsiteBuild(html, css, js)
+
+
+@route
+def build_website(state: State, description: str) -> Page:
+    """Send the website description to Gemini and build the website."""
+    if not description.strip():
+        return show_builder(state)
+
+    # Create a prompt for Gemini to generate website code
+    prompt = f"""Generate a complete HTML website based on this description: {description}
+
+Format your response with these exact tags:
+<html>
+[Complete HTML structure here, including <head> and <body>]
+</html>
+
+<style>
+[CSS styling here]
+</style>
+
+<script>
+[JavaScript code here if needed]
+</script>"""
+
+    # Call Gemini to generate the website
+    messages = [LLMMessage("user", prompt)]
+    result = call_gemini(messages)
+
+    # Parse the response and create a WebsiteBuild
+    if isinstance(result, LLMResponse):
+        new_website = parse_website_response(result.content)
+        new_state = State(new_website, description)
+    else:
+        # Error occurred, show error message
+        error_html = f"<html><body><h1>Error building website</h1><p>{result.message}</p></body></html>"
+        new_website = WebsiteBuild(error_html, "", "")
+        new_state = State(new_website, description)
+
+    return show_builder(new_state)
+
+
+def show_builder(state: State) -> Page:
+    """Display the website builder interface."""
     content = [
-        "Chatbot using Gemini",
-        "---"
+        "Describe the website you want to build:",
+        TextArea("description", "", rows=5, cols=50),
+        LineBreak(),
+        Button("Build Website", build_website), # type: ignore
     ]
 
-    # Show conversation history
-    if state.conversation:
-        for msg in state.conversation:
-            if msg.role == "user":
-                content.append(f"You: {msg.content}")
-            elif msg.role == "assistant":
-                content.append(f"Bot: {msg.content}")
-        content.append("---")
-
-    # Input for new message
-    content.extend([
-        "Your message:",
-        TextArea("user_message", "", rows=3, cols=50),
-        LineBreak(),
-        Button("Send", send_message), # type: ignore
-        Button("Clear Conversation", clear_conversation), # type: ignore
-    ])
+    # Show the last built website if it exists
+    if state.last_website is not None:
+        content.extend([
+            "---",
+            "Your Built Website:",
+            state.last_website.website_html,
+            LineBreak(),
+            Button("Build Another", index), # type: ignore
+        ])
 
     return Page(state, content)
 
 
-@route
-def send_message(state: State, user_message: str) -> Page:
-    """Send a message to the LLM and get a response."""
-    if not user_message.strip():
-        return show_chat(state)
-
-    # Add user message to conversation
-    user_msg = LLMMessage("user", user_message)
-    state.conversation.append(user_msg)
-
-    result = call_gemini(state.conversation)
-
-    # Handle the result
-    if isinstance(result, LLMResponse):
-        # Success! Add the response to conversation
-        assistant_msg = LLMMessage("assistant", result.content)
-        state.conversation.append(assistant_msg)
-    else:
-        # Error occurred
-        error_msg = LLMMessage("assistant", f"Error: {result.message}")
-        state.conversation.append(error_msg)
-    return show_chat(state)
-
-
-@route
-def clear_conversation(state: State) -> Page:
-    """Clear the conversation history."""
-    state.conversation = []
-    return show_chat(state)
-
-
-start_server(State([]))
+start_server(State(None, ""))
