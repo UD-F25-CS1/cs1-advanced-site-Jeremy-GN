@@ -5,7 +5,7 @@ from drafter.llm import LLMMessage, LLMResponse, call_gemini, set_gemini_server
 
 
 set_site_information(
-    author="your_email@udel.edu",
+    author="testing!!",
     description="A brief description of what your website does",
     sources="List any help resources or sources you used",
     planning="your_planning_document.pdf",
