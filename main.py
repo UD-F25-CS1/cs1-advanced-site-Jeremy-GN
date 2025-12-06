@@ -104,17 +104,75 @@ Format your response with these exact tags:
 [JavaScript code here if needed]
 </script>"""
 
-    # Call Gemini to generate the website
+    # Call Gemini to generate the website and handle errors/edge-cases
     messages = [LLMMessage("user", prompt)]
-    result = call_gemini(messages)
+    try:
+        result = call_gemini(messages)
+    except Exception as exc:
+        # Unexpected exception when calling the API (network/proxy/library)
+        error_html = (
+            "<html><body><h1>Error building website</h1>"
+            f"<p>Exception calling Gemini: {repr(exc)}</p>"
+            "</body></html>"
+        )
+        new_website = WebsiteBuild(error_html, "", "")
+        new_state = State(new_website, description)
+        return show_builder(new_state)
 
-    # Parse the response and create a WebsiteBuild
+    # If the library returned a structured error (not an LLMResponse), try
+    # to recover useful text. Some proxies or streaming responses use a
+    # `parts` field or return a dict-like payload; handle common shapes.
+    content_text = None
     if isinstance(result, LLMResponse):
-        new_website = parse_website_response(result.content)
+        content_text = result.content
+    else:
+        # Try common fallbacks: dict-like with 'parts', or .message
+        try:
+            if isinstance(result, dict) and "parts" in result:
+                # parts may be a list of text chunks
+                parts = result.get("parts") or []
+                assembled = []
+                for p in parts:
+                    if isinstance(p, dict):
+                        assembled.append(p.get("text") or p.get("content") or "")
+                    else:
+                        assembled.append(str(p))
+                content_text = "".join(assembled)
+            elif hasattr(result, "message"):
+                # library-style error object with a message
+                error_html = (
+                    "<html><body><h1>Error building website</h1>"
+                    f"<p>{result.message}</p>"
+                    "</body></html>"
+                )
+                new_website = WebsiteBuild(error_html, "", "")
+                new_state = State(new_website, description)
+                return show_builder(new_state)
+            else:
+                # Last resort: stringify the object
+                content_text = str(result)
+        except KeyError as ke:
+            # This often surfaces as "'parts'" in error messages
+            error_html = (
+                "<html><body><h1>Error building website</h1>"
+                f"<p>KeyError accessing response parts: {repr(ke)}</p>"
+                "</body></html>"
+            )
+            new_website = WebsiteBuild(error_html, "", "")
+            new_state = State(new_website, description)
+            return show_builder(new_state)
+
+    # If we have some text from the LLM, parse it into html/css/js
+    if content_text:
+        new_website = parse_website_response(content_text)
         new_state = State(new_website, description)
     else:
-        # Error occurred, show error message
-        error_html = f"<html><body><h1>Error building website</h1><p>{result.message}</p></body></html>"
+        # No usable content returned
+        error_html = (
+            "<html><body><h1>No content returned</h1>"
+            "<p>The LLM returned no usable content.</p>"
+            "</body></html>"
+        )
         new_website = WebsiteBuild(error_html, "", "")
         new_state = State(new_website, description)
 
